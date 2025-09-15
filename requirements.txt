@@ -1,0 +1,9 @@
+torch==2.8.0
+torchvision==0.23.0
+torchaudio==2.8.0
+pyannote.audio==3.3.2
+ffmpeg-python==0.2.0
+opencv-python==4.10.0.84
+mediapipe==0.10.21
+webrtcvad-wheels==2.0.14
+dotenv==0.9.9
