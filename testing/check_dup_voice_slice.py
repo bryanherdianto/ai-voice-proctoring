@@ -48,7 +48,7 @@ def process_slice_with_frames(
         total_frames = len(frame_sims)
         different_percentage = (different_frames / total_frames) * 100
 
-        multiple_speakers = different_percentage > 30
+        multiple_speakers = different_percentage > 20
 
         return (
             slice_num,
@@ -261,8 +261,8 @@ if __name__ == "__main__":
     print("Voice Similarity Analysis\n")
 
     results = analyze_audio_slices(
-        "assets/my_voice_short.wav",
-        "assets/my_voice_long.wav",
+        "assets/dob_voice_short.wav",
+        "assets/dob_voice_long.wav",
         slice_duration=10,
         parallel=True,
         save_processed=True,
