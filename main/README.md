@@ -1,13 +1,52 @@
 # Double Voice Detection Module
 
-A simple and easy-to-use module for detecting multiple speakers in audio recordings using voice embeddings and frame-level analysis.
+A simple and easy-to-use module designed to detect voice spoofing and double voices in audio recordings. By utilizing voice embeddings and frame-level analysis, this tool identifies the presence of multiple speakers to ensure audio authenticity and prevent unauthorized external assistance.
+
+## Flowchart
+
+![picture 0](https://i.imgur.com/wfkWoPz.png)  
+
+## Models & Approaches
+
+We evaluated three primary baselines for the voice verification system, weighing performance against computational efficiency.
+
+1. Pyannote.Audio  
+    A robust industry standard for speaker diarization and verification.
+
+    Pros: Highly accurate for separating speakers and offline processing.
+
+    Cons: High latency makes it unsuitable for instant real-time feedback (processing often completes after the speech ends). It lacks phoneme-level verification, making it susceptible to visual spoofing (random lip movements).
+
+2. SyncNet  
+    A deep learning model for audio-visual synchronization that verifies identity based on lip movements and voice.
+
+    Pros: Performs phoneme-level verification, making it robust against random lip movements and harder to spoof visually.
+
+    Cons: Computationally expensive; requires a GPU for effective performance. As a "black box" deep learning model, it is difficult to quantify validation metrics compared to standard embedding distances.
+
+3. Resemblyzer (Selected Approach)  
+    A lightweight alternative focusing on high-speed voice embedding and verification.
+
+    Pros: Low computational overhead with support for parallel processing. Significantly faster than Pyannote.Audio, offering near real-time performance on standard CPUs.
+
+    Cons: Similar to Pyannote, it lacks phoneme-level verification.
+
+We have chosen Resemblyzer as the core engine for this project. While SyncNet offers superior anti-spoofing via visual cues, the hardware requirements (GPU) are too high for accessible deployment. Resemblyzer offers the best balance, providing high-speed, parallelizable detection that fits within the computational constraints of standard proctoring/monitoring environments while maintaining reliable speaker differentiation.
 
 ## Installation
 
-1. Install required dependencies:
+1. Install required dependencies using the provided script:
+
+    **Windows:**
+
+    ```bat
+    install.bat
+    ```
+
+    **Linux/macOS:**
 
     ```bash
-    pip install -r requirements.txt
+    bash install.sh
     ```
 
 2. Import the module in your Python script:
@@ -49,6 +88,8 @@ Detect if multiple speakers are present in specified audio segments.
 - `parallel` (bool, optional): Whether to use parallel processing. Default: `True`
 - `threshold` (float, optional): Similarity threshold for frame-level detection. Default: `0.6`
 - `different_speaker_threshold` (float, optional): Percentage threshold for multiple speaker detection. Default: `20.0`
+- `window_size` (float, optional): Size of the analysis window in seconds. Default: `1.0`
+- `hop_size` (float, optional): Step size between windows in seconds. Default: `0.5`
 
 **Returns:**
 
@@ -68,48 +109,6 @@ Dictionary containing:
    - If more than 20% of frames have similarity < 0.6, multiple speakers are detected
    - Returns YES/NO with suspicious segment timestamps
 
-## Example Use Cases
-
-### 1. Exam Proctoring
-
-```python
-exam_timestamps = [
-    [0, 30],       # Reference (first 30 seconds)
-    [30, 300],     # Question 1
-    [300, 600],    # Question 2
-    [600, 900],    # Question 3
-]
-
-result = detect_double_voice(exam_timestamps, audio="exam_recording.wav")
-```
-
-### 2. Interview Verification
-
-```python
-interview_segments = [
-    [0, 10.0],      # Reference (intro)
-    [10.5, 45.2],   # Question 1 answer
-    [60.0, 120.5],  # Question 2 answer
-    [150.0, 200.0]  # Question 3 answer
-]
-
-result = detect_double_voice(interview_segments, audio="interview.wav")
-```
-
-### 3. Continuous Monitoring
-
-```python
-duration = 300
-segment_length = 10
-timestamps = [[i, i+segment_length] for i in range(0, duration, segment_length)]
-
-result = detect_double_voice(
-    timestamps,
-    audio="recording.wav",
-    parallel=True
-)
-```
-
 ## Performance Tips
 
 - **Parallel Processing**: Enable `parallel=True` (default) for faster processing
@@ -119,4 +118,4 @@ result = detect_double_voice(
 
 ## Requirements
 
-Use Python 3.11.9 and install the packages listed in requirements.txt.
+Use Python 3.11.9 and install the packages using the provided installation scripts.

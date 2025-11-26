@@ -16,6 +16,7 @@ def _process_segment_frames(
     sample_rate: int = 16000,
     window_size: float = 1.0,
     hop_size: float = 0.5,
+    different_speaker_threshold: float = 20.0,
     threshold: float = 0.6,
 ) -> Dict:
     enc = VoiceEncoder()
@@ -26,19 +27,22 @@ def _process_segment_frames(
 
     frame_similarities = []
 
-    for i in range(0, len(audio_data) - window_samples, hop_samples):
+    i = 0
+    while i < len(audio_data):
         frame = audio_data[i : i + window_samples]
-
-        if len(frame) < min_frame_length:
+        # If frame is shorter than min_frame_length and not the last frame, skip
+        if len(frame) < min_frame_length and (i + window_samples < len(audio_data)):
+            i += hop_samples
             continue
-
+        # If last frame is shorter, still process it
         try:
             frame_emb = enc.embed_utterance(frame)
             frame_sim = np.dot(reference_embedding, frame_emb)
             frame_similarities.append(frame_sim)
         except Exception as e:
             warnings.warn(f"Error processing frame at index {i}: {e}")
-            continue
+            # continue to next frame
+        i += hop_samples
 
     if not frame_similarities:
         return {
@@ -61,7 +65,7 @@ def _process_segment_frames(
     total_frames = len(frame_sims)
     different_percentage = (different_frames / total_frames) * 100
 
-    has_multiple_speakers = different_percentage > 20
+    has_multiple_speakers = different_percentage > different_speaker_threshold
 
     return {
         "has_multiple_speakers": has_multiple_speakers,
@@ -75,7 +79,18 @@ def _process_segment_frames(
 
 
 def _process_single_timestamp(args: Tuple) -> Tuple[int, float, float, Dict]:
-    index, start_time, end_time, audio_path, reference_embedding, sample_rate = args
+    (
+        index,
+        start_time,
+        end_time,
+        audio_path,
+        reference_embedding,
+        sample_rate,
+        window_size,
+        hop_size,
+        threshold,
+        different_speaker_threshold,
+    ) = args
 
     try:
         y, sr = librosa.load(audio_path, sr=None)
@@ -94,7 +109,13 @@ def _process_single_timestamp(args: Tuple) -> Tuple[int, float, float, Dict]:
         processed_segment = preprocess_wav(segment, source_sr=sr)
 
         results = _process_segment_frames(
-            processed_segment, reference_embedding, sample_rate=16000
+            processed_segment,
+            reference_embedding,
+            sample_rate=sample_rate,
+            window_size=window_size,
+            hop_size=hop_size,
+            threshold=threshold,
+            different_speaker_threshold=different_speaker_threshold,
         )
 
         return (index, start_time, end_time, results)
@@ -119,6 +140,8 @@ def detect_double_voice(
     parallel: bool = True,
     threshold: float = 0.6,
     different_speaker_threshold: float = 20.0,
+    window_size: float = 1.0,
+    hop_size: float = 0.5,
 ) -> Dict:
     """
     Detect if multiple speakers are present in specified audio segments.
@@ -171,13 +194,20 @@ def detect_double_voice(
                     audio,
                     reference_embedding,
                     16000,
+                    window_size,
+                    hop_size,
+                    threshold,
+                    different_speaker_threshold,
                 )
                 future = executor.submit(_process_single_timestamp, args)
                 futures.append(future)
 
             for future in as_completed(futures):
-                result = future.result()
-                results.append(result)
+                try:
+                    result = future.result(timeout=60)  # Timeout in seconds
+                    results.append(result)
+                except Exception as e:
+                    warnings.warn(f"Segment processing timed out or failed: {e}")
 
         results.sort(key=lambda x: x[0])
     else:
@@ -189,6 +219,10 @@ def detect_double_voice(
                 audio,
                 reference_embedding,
                 16000,
+                window_size,
+                hop_size,
+                threshold,
+                different_speaker_threshold,
             )
             result = _process_single_timestamp(args)
             results.append(result)
